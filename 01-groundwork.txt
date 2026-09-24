@@ -1,0 +1,18 @@
+task 1, in the current directory, create folders called
+
+research
+artifacts
+outputs
+
+task 2, the research directory should have the following folders created
+by doing a git clone of the following github repos:
+
+use npx tiged if you need subfolders, git clone for whole repos
+
+repo,branch,subfolder
+esphome/esphome,default branch, all
+tuhde/Periph,default branch,all
+periph/devices, default branch, all
+
+
+
