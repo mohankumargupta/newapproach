@@ -1,0 +1,7 @@
+need to clone repo  from github using npx tiged
+
+repo: mohankumargupta/espforge 
+branch: espforgev2 
+path: v2
+rename: espforge
+
