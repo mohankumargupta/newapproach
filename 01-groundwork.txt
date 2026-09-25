@@ -12,7 +12,8 @@ NB: use npx tiged if you need subfolders,
 git clone for whole repos
 
 repo,branch,subfolder
-esphome/esphome,default branch, all
+esphome/esphome,default branch,esphome/components
+esphome/esphome.io,default branch,src/content/docs/components
 tuhde/Periph,default branch,all
 periph/devices, default branch, all
 
