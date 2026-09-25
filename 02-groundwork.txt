@@ -1,1 +1,1 @@
-/discover-rust-crates tmp102
+/discover-rust-crates
