@@ -1,0 +1,22 @@
+Switching to build mode to implement your ESPForge driver.
+Got it — TMP102 is queued. I'll study the existing patterns and research to build the driver.
+The reference implementation covers the essentials well. I'll check the ESPHome integration and finalize the design.
+Design is clear — generic I2C driver with blocking and async reads. I'll implement it now.
+Base compile passes. I'll verify the existing suite still passes and check the async path.
+TMP102 driver implemented.
+
+**Files created** in `espforge/espforge-runtime/src/devices/tmp102/`:
+- `register.rs` — `DEFAULT_ADDRESS` (0x48), `address_from_pins()`, register consts, `TemperaturePayload::to_celsius()` (12-bit `raw >> 4 * 0.0625`, sign-extending negatives, matching ESPHome `tmp102.cpp` and `tmp1x2` normal-mode vectors)
+- `error.rs` — `Error::Bus` mapping any I2C error (mirrors `rc522.rs:Spierror`)
+- `implementation.rs` — single generic `Tmp102<I2C>` (`RefCell` + `&self`, ADR-008) with blocking `read_temperature()` and async `read_temperature_async()` (distinct name avoids ambiguity when a bus impls both traits; both live here since the logic is one register read — no need for `blocking.rs`/`async.rs` or marker generics)
+- `mod.rs` — re-exports
+
+**Wiring:** `tmp102 = []` feature in `espforge-runtime/Cargo.toml`, `pub mod tmp102` + `pub use tmp102::Tmp102` in `devices/mod.rs`.
+
+**Scope:** continuous-mode temperature reads only. Extended 13-bit mode, one-shot/shutdown, conversion rate, thresholds/thermostat deliberately excluded.
+
+**Verified:**
+- `cargo test -p espforge-runtime --features tmp102` — compiles, green
+- `cargo test -p espforge-runtime --features rc522` — 70 passed, no regression
+- `cargo check -p espforge-runtime --features tmp102,embassy` — async impl compiles
+- Conversion spot-checked against `tmp1x2` vectors (100°C, 25°C, 0°C, −128°C, −0.25°C, 75°C)
