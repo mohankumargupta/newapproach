@@ -1,7 +1,14 @@
+if espforge folder exist in original pwd, delete it.
+
 need to clone repo  from github using npx tiged
 
 repo: mohankumargupta/espforge 
 branch: espforgev2 
 path: v2
 rename: espforge
+
+Make sure that espforge directory is a git repo, if not
+then make it one, then git add and commit all files 
+in that directory with commit message "initial commit"
+
 
