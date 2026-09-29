@@ -8,15 +8,15 @@ task 2, the research directory should have the following
 folders created by doing a 
 git clone of the following github repos:
 
-NB: use npx tiged if you need subfolders, 
+NB: use npx tiged if you need subfolders 
+(usage npx tiged user/repo/subfolder#branch), 
 git clone for whole repos
 
 repo,branch,subfolder
-esphome/esphome,default branch,esphome/components
-esphome/esphome.io,default branch,src/content/docs/components
-tuhde/Periph,default branch,all
-periph/devices, default branch, all
-
+esphome/esphome,dev,esphome/components
+esphome/esphome.io,current,src/content/docs/components
+tuhde/Periph,main,
+periph/devices,main,
 
 task 3, under this research folder create a folder called 
 goldstandardcrates.
@@ -35,4 +35,7 @@ eeprom24x
 lis3dh
 lis3dh-async
 
+
+Once all are cloned, if there is a difference between the
+crate name and the repo name, then rename to crate name
 
