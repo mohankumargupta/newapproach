@@ -17,3 +17,22 @@ esphome/esphome.io,default branch,src/content/docs/components
 tuhde/Periph,default branch,all
 periph/devices, default branch, all
 
+
+task 3, under this research folder create a folder called 
+goldstandardcrates.
+
+cd to that goldstandardcrates folder,
+for each of these crates, run cargo clone <crate>:
+
+scd4x
+sht4x
+bme280
+ds323x
+ads1x1x
+mcp251xfd
+tcs3472
+eeprom24x
+lis3dh
+lis3dh-async
+
+
