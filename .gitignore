@@ -1,4 +1,5 @@
-artifacts
 outputs
 research
 rustcrates
+debug
+target

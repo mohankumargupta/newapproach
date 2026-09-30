@@ -7,15 +7,17 @@ embedded_hal v1 and embedded_hal_async v1
 task1, read outputs/<device>/plan.md in full.
 we need to implement only the 
 functionality categorised as Essential.
-so identify the functionality essential 
+ 
+task 2, there is a skill called guidance-rust-crates-embedded,
+it will inform you how to structure the rust crate properly.
 
-task2, once functionality identified, implement
+task3, once functionality identified, implement
 in artifacts/<device>, you may need to create this 
 directory. so that you dont start with a blank 
 slate, i have existing rust crates for device 
 in rustcrates directory. you can take inspiration
 from those, but if you think you can do it a 
-better way, do that.  no tests are required at this stage.
+better way, do that. 
 
 if a device has multiple interfaces, you must accomodate.
 
