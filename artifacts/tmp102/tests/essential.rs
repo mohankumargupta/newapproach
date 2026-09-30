@@ -74,10 +74,7 @@ async fn tmp102_returns_to_continuous_mode() {
             vec![REG_CONFIG],
             vec![DEFAULT_MSB | 0x01, DEFAULT_LSB],
         ),
-        I2cTransaction::write(
-            DEVICE_ADDRESS,
-            vec![REG_CONFIG, DEFAULT_MSB, DEFAULT_LSB],
-        ),
+        I2cTransaction::write(DEVICE_ADDRESS, vec![REG_CONFIG, DEFAULT_MSB, DEFAULT_LSB]),
     ];
     let mut sensor = setup_tmp102(&expectations);
     sensor

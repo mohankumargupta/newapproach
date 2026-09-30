@@ -1,0 +1,12 @@
+Cloning that branch fresh and wiring up git.
+Syntax checks out — clearing the old copy and pulling `v2` from `espforgev2`.
+Done:
+
+- Deleted existing `espforge/` in `/home/pi/junk/newapproach`
+- Cloned via: `npx -y tiged mohankumargupta/espforge/v2#espforgev2 espforge --verbose`
+  - resolved to commit `3f31a6771fd5624eb8cba5f2a48d4aca5b6f61a5`
+  - extracted `/v2` to `espforge/`
+- `espforge/.git` did not exist, so ran `git init espforge`
+- In `espforge/`: `git add -A`, `git commit -m "initial commit"` (146 files, commit `730fe74`), then `git branch -M main`
+
+Verified: `git -C espforge rev-parse --abbrev-ref HEAD` → `main`, working tree clean.

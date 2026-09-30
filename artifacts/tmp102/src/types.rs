@@ -39,14 +39,14 @@ impl SlaveAddr {
     }
 }
 
-/// Conversion mode of the sensor.
+/// Conversion rate of the sensor.
 ///
 /// - [`Continuous`](ConversionMode::Continuous): the device converts
 ///   temperature continuously (power-up default).
 /// - [`Shutdown`](ConversionMode::Shutdown): the device shuts down and
 ///   stops converting, cutting current consumption to minimise power.
-///   A single conversion can then be triggered on demand (one-shot
-///   triggering is Desirable functionality and out of scope here).
+///   A single conversion can then be triggered on demand (see
+///   Desirable one-shot support).
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ConversionMode {
     /// Continuous conversion mode (default).
@@ -54,4 +54,59 @@ pub enum ConversionMode {
     Continuous,
     /// Shutdown (one-shot) mode.
     Shutdown,
+}
+
+/// Conversion rate for continuous conversion mode.
+///
+/// Controls how often the device converts in continuous mode,
+/// trading wake time / power against responsiveness.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ConversionRate {
+    /// 0.25 Hz (slowest, lowest power).
+    Hz0_25,
+    /// 1 Hz.
+    Hz1,
+    /// 4 Hz (power-up default).
+    #[default]
+    Hz4,
+    /// 8 Hz (fastest, most responsive).
+    Hz8,
+}
+
+/// Fault queue: number of consecutive faults needed to trigger an alert.
+///
+/// Used to debounce false alarms from transient temperature spikes.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FaultQueue {
+    /// 1 consecutive fault triggers an alert (power-up default).
+    #[default]
+    Consecutive1,
+    /// 2 consecutive faults trigger an alert.
+    Consecutive2,
+    /// 4 consecutive faults trigger an alert.
+    Consecutive4,
+    /// 6 consecutive faults trigger an alert.
+    Consecutive6,
+}
+
+/// Alert polarity for the ALERT pin and alert flag.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum AlertPolarity {
+    /// Active low (power-up default).
+    #[default]
+    ActiveLow,
+    /// Active high.
+    ActiveHigh,
+}
+
+/// Thermostat mode controlling the ALERT pin behaviour.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ThermostatMode {
+    /// Comparator mode (power-up default): alert stays active until the
+    /// temperature falls below the low threshold.
+    #[default]
+    Comparator,
+    /// Interrupt mode: alert is generated when the temperature exceeds the
+    /// high threshold or goes below the low threshold.
+    Interrupt,
 }

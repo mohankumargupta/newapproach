@@ -1,0 +1,14 @@
+Discovering Rust crates — scanning workspace for the right approach.
+Found the crate discovery spec — checking your target device.
+Target is tmp102 — now hunting down compatible drivers.
+Found two strong candidates — verifying no others before cloning.
+Both drivers verified — final listing to confirm.
+Done. Device `tmp102` (from `processing.txt`), cloned 2 qualifying repos into `rustcrates/tmp102/`:
+
+- `rustcrates/tmp102/tmp1x2` — from `https://github.com/eldruin/tmp1x2-rs` (crate `tmp1x2` v1.1.0). Deps: `embedded-hal ^1.0` (required) + `embedded-hal-async ^1.0` (optional, `async` feature). Verified `.git` + `Cargo.toml`.
+- `rustcrates/tmp102/embedded-devices` — from `https://github.com/oddlama/embedded-devices` (crate `embedded-devices`, contains `src/devices/texas_instruments/tmp102/`). Deps: `embedded-hal ^1.0` (required) + `embedded-hal-async ^1.0` (optional). Verified `.git` + `Cargo.toml`.
+
+Excluded:
+- `tmp102` v1.0.0 (`andygrove/tmp102-rs`) — only depends on `i2cdev ^0.3.1`, no `embedded-hal`, fails criteria. Not cloned.
+
+`ls rustcrates/tmp102` → `embedded-devices`, `tmp1x2`.

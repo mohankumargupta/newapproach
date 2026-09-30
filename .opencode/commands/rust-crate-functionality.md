@@ -3,10 +3,12 @@ embedded_hal v1 and embedded_hal_async v1
 
 # context variable
 <device> contents of processing.txt in original pwd
+<category> one of Essential, Desirable, Rare.  
+
 
 task1, read outputs/<device>/plan.md in full.
 we need to implement only the 
-functionality categorised as Essential.
+functionality categorised as $1.
  
 task 2, there is a skill called guidance-rust-crates-embedded,
 it will inform you how to structure the rust crate properly.

@@ -7,8 +7,8 @@ run num:
 	device=$(cat processing.txt)
 	mkdir -p outputs/$device 	
 	opencode run $(cat {{ num }}-*) | tee outputs/${device}/{{ num }}.log
-	if [ $num -eq 01 ]; then
-	  cp outputs/research.log
+	if [ {{ num }} -eq 01 ]; then
+	  cp cp outputs/${device}/{{ num }}.log outputs/research.log 
 	fi 
 
 setup:

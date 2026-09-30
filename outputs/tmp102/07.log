@@ -1,0 +1,25 @@
+Routing to the right embedded-crate flow — inspecting your workspace first.
+Confirmed Rare scope for tmp102 — checking current implementation before adding the missing features.
+I've mapped the five Rare items to their config bits — now drafting the implementation.
+Core Rare logic is drafted — updating exports and docs to expose the new API.
+Docs are current — adding minimal integration tests for the Rare paths.
+All Rare tests pass in both modes — running final lints.
+Rare functionality implemented for `tmp102` (`artifacts/tmp102`), covering TMP102 + TMP112, blocking + async via `maybe_async_cfg`:
+
+**Plan items 7–11 (`outputs/tmp102/plan.md`):**
+- `enable_extended_measurement_mode()` / `disable_extended_measurement_mode()` — LSB `0x10` RMW
+- `set_fault_queue(FaultQueue::Consecutive4)` — MSB `0x10/0x08`, new `FaultQueue::{Consecutive1,2,4,6}` in `src/types.rs:47`
+- `set_alert_polarity(AlertPolarity::ActiveHigh)` — MSB `0x04`, new `AlertPolarity` enum
+- `set_thermostat_mode(ThermostatMode::Interrupt)` — MSB `0x02`, new `ThermostatMode` enum
+- `is_comparator_mode_alert_active()` — `polarity_high == alert_flag` (MSB `0x04` vs LSB `0x20`), matching `tmp1x2` reference
+
+**Files:**
+- `src/register.rs` — added `THERMOSTAT`, `ALERT_POLARITY`, `FAULT_QUEUE0/1`, `ALERT`
+- `src/rare.rs` — full impl blocks for both `Tmp102`/`Tmp112` (was placeholder)
+- `src/lib.rs:72` — exports new types, docs now Essential+Desirable+Rare
+- `Cargo.toml`, `README.md` — scope updated
+- `tests/rare.rs` — 6 mock tests (extended on/off, fault queue, polarity+thermostat, alert status ×2 polarities, Tmp112 coverage)
+
+**Verify:**
+- `cargo test` — 5 essential + 6 desirable + 6 rare pass
+- `cargo test --features async` — same, async variants pass

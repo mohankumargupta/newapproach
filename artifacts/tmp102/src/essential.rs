@@ -24,14 +24,20 @@ pub(crate) fn convert_temp_from_register(msb: u8, lsb: u8) -> f32 {
     let sign = (u16::from(msb & 0b1000_0000)) << 8;
     let extended_mode = (lsb & 1) != 0;
     if extended_mode {
-        let sign = if sign != 0 { sign | 0b1111_0000 << 8 } else { 0 };
-        let value =
-            sign | (u16::from(msb & 0b0111_1111) << 5) | u16::from(lsb >> 3);
+        let sign = if sign != 0 {
+            sign | 0b1111_0000 << 8
+        } else {
+            0
+        };
+        let value = sign | (u16::from(msb & 0b0111_1111) << 5) | u16::from(lsb >> 3);
         f32::from(value as i16) * 0.0625
     } else {
-        let sign = if sign != 0 { sign | 0b1111_1000 << 8 } else { 0 };
-        let value =
-            sign | (u16::from(msb & 0b0111_1111) << 4) | u16::from(lsb >> 4);
+        let sign = if sign != 0 {
+            sign | 0b1111_1000 << 8
+        } else {
+            0
+        };
+        let value = sign | (u16::from(msb & 0b0111_1111) << 4) | u16::from(lsb >> 4);
         f32::from(value as i16) * 0.0625
     }
 }
@@ -67,9 +73,7 @@ where
             ConversionMode::Shutdown => msb | BitFlagsHigh::SHUTDOWN,
             ConversionMode::Continuous => msb & !BitFlagsHigh::SHUTDOWN,
         };
-        self.core
-            .write_register(Register::CONFIG, msb, lsb)
-            .await
+        self.core.write_register(Register::CONFIG, msb, lsb).await
     }
 }
 
@@ -102,9 +106,7 @@ where
             ConversionMode::Shutdown => msb | BitFlagsHigh::SHUTDOWN,
             ConversionMode::Continuous => msb & !BitFlagsHigh::SHUTDOWN,
         };
-        self.core
-            .write_register(Register::CONFIG, msb, lsb)
-            .await
+        self.core.write_register(Register::CONFIG, msb, lsb).await
     }
 }
 
@@ -113,10 +115,7 @@ mod tests {
     use super::convert_temp_from_register as convert;
 
     fn assert_near(left: f32, right: f32) {
-        assert!(
-            (left - right).abs() < f32::EPSILON,
-            "{left} != {right}"
-        );
+        assert!((left - right).abs() < f32::EPSILON, "{left} != {right}");
     }
 
     #[test]
