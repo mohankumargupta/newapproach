@@ -24,7 +24,3 @@ better way, do that.
 if a device has multiple interfaces, you must accomodate.
 
 must implement both blocking and async versions.
-
-
-
-

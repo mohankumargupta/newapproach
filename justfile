@@ -41,17 +41,17 @@ _stage cmd num args='':
 task03-discover-rust-crates:
   @just _stage discover-rust-crates task03-discover-rust-crates
 
-task04-plan-espforge-driver:
-  @just _stage plan-espforge-driver task04-plan-espforge-driver
+task04-plan-rust-driver:
+  @just _stage plan-rust-driver task04-plan-rust-driver
 
-task05-espforge-driver:
-  @just _stage rust-crate-driver task05-espforge-driver Essential
+task05-rust-driver:
+  @just _stage rust-driver task05-rust-driver Essential
 
-task06-espforge-driver:
-  @just _stage rust-crate-driver task06-espforge-driver Desirable
+task06-rust-driver:
+  @just _stage rust-driver task06-rust-driver Desirable
 
-task07-espforge-driver:
-  @just _stage rust-crate-driver task07-espforge-driver Rare
+task07-rust-driver:
+  @just _stage rust-driver task07-rust-driver Rare
 
 
 task10-setup:
