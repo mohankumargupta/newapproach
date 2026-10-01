@@ -1,0 +1,22 @@
+Discovering crates in tmp102 — mapping the workspace first.
+Found your discover workflow — now pulling the full instructions.
+Confirmed target is tmp102 with embedded-hal criteria — checking existing candidates.
+Live check confirms two qualifying crates — now cloning them.
+Both repos cloned — verifying they meet the requirements.
+Done for `tmp102`:
+
+**crates.io search `tmp102` → 3 hits (verified live 2026-10-01):**
+- `tmp102` 1.0.0 (`https://github.com/andygrove/tmp102-rs`) — deps: `i2cdev ^0.3.1` only → **FAIL** (no `embedded-hal` v1 / `embedded-hal-async` v1)
+- `tmp1x2` 1.1.0 (`https://github.com/eldruin/tmp1x2-rs`) — deps: `embedded-hal ^1.0` (required), `embedded-hal-async ^1.0` (optional) → **PASS**
+- `embedded-devices` 0.10.3 (`https://github.com/oddlama/embedded-devices`) — deps: `embedded-hal ^1.0` (required), `embedded-hal-async ^1.0` (optional) → **PASS**, includes `texas_instruments-tmp102` feature
+
+**Cloned:**
+- `git clone https://github.com/eldruin/tmp1x2-rs rustcrates/tmp102/tmp1x2`
+- `git clone https://github.com/oddlama/embedded-devices rustcrates/tmp102/embedded-devices`
+
+Verified: both have `.git/` + `Cargo.toml`, `Cargo.toml` confirms `embedded-hal = "1.0"`:
+```
+rustcrates/tmp102:
+embedded-devices
+tmp1x2
+```

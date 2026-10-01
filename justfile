@@ -44,14 +44,14 @@ task03-discover-rust-crates:
 task04-plan-rust-driver:
   @just _stage plan-rust-driver task04-plan-rust-driver
 
-task05-rust-driver:
-  @just _stage rust-driver task05-rust-driver Essential
+task05-rust-driver-essential:
+  @just _stage rust-driver task05-rust-driver-essential Essential
 
-task06-rust-driver:
-  @just _stage rust-driver task06-rust-driver Desirable
+task06-rust-driver-desirable:
+  @just _stage rust-driver task06-rust-driver-desirable Desirable
 
-task07-rust-driver:
-  @just _stage rust-driver task07-rust-driver Rare
+task07-rust-driver-rare:
+  @just _stage rust-driver task07-rust-driver-rare Rare
 
 
 task10-setup:

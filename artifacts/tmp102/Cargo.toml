@@ -2,9 +2,8 @@
 name = "tmp102"
 version = "0.1.0"
 edition = "2021"
+description = "Platform-agnostic no_std driver for TMP102 / TMP112 digital temperature sensors (I2C)."
 license = "MIT OR Apache-2.0"
-description = "Platform-agnostic no_std driver for the TMP102 and TMP112 digital temperature sensors (Essential + Desirable + Rare functionality)."
-readme = "README.md"
 keywords = ["temperature", "sensor", "i2c", "driver", "embedded-hal-driver"]
 categories = ["embedded", "hardware-support", "no-std"]
 
@@ -20,3 +19,4 @@ maybe-async-cfg = "0.2.5"
 [dev-dependencies]
 embedded-hal-mock = { version = "0.11.1", default-features = false, features = ["eh1", "embedded-hal-async"] }
 tokio = { version = "1", features = ["rt", "macros"] }
+maybe-async-cfg = "0.2.5"

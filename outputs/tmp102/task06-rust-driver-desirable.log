@@ -1,0 +1,26 @@
+Switching to your rust TMP102 driver — mapping the workspace first.
+Found two TMP102 sources — checking project status to see what's needed.
+Essential stage is done — now scoping Desirable items #3-#6 from the plan.
+Plan confirmed against the reference driver — implementing Desirable now.
+Core types fixed — now adding the Desirable conversion logic.
+Desirable API done — wiring up exports and tests.
+Tests pass — fixing the remaining lint issues.
+Implemented Desirable TMP102 driver in `artifacts/tmp102`:
+
+**Scope (plan.md Desirable #3–#6):**
+- `trigger_one_shot_measurement()` – writes CONFIG with OS bit, uncached (matches `tmp1x2` reference)
+- `is_one_shot_measurement_result_ready() -> bool` – reads CONFIG, checks OS bit
+- `set_conversion_rate(ConversionRate::{_0_25Hz,_1Hz,_4Hz,_8Hz})`
+- `set_high/low_temperature_threshold(f32)` – clamped, extended-mode aware via cached config
+
+**Supporting changes:**
+- `types.rs`: new `ConversionRate` enum (reference-compatible names, default `_4Hz`)
+- `register.rs`: un-hid `T_LOW/T_HIGH`, `ONE_SHOT`, `CONV_RATE0/1`, `EXTENDED_MODE`; added `with_high/low_lsb` helpers
+- `tmp102.rs`: added `convert_temp_to_register_normal/extended` (clamped, `#[allow(clippy::manual_clamp)]` to preserve reference NaN semantics)
+- `lib.rs`: export `ConversionRate`; `README.md` status updated
+- `tests/desirable.rs`: 6 mock tests (trigger bytes, ready true/false, CR 1Hz/8Hz, thresholds incl. clamping)
+
+**Verified:**
+- `cargo test` – 2 unit + 6 desirable + 5 essential + 2 doctest pass
+- `cargo test --features async` – same, `_async` variants pass
+- `cargo clippy --all-targets -- -D warnings` clean, `cargo fmt --check` clean

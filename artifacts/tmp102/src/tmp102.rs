@@ -1,12 +1,8 @@
-//! TMP102 / TMP112 device structs and shared low-level I2C logic.
+//! Core device struct, I2C plumbing and shared temperature conversion.
 //!
-//! The TMP102 and the TMP112 family (TMP112A/B/N) are register-compatible:
-//! all bus interaction lives in the shared [`Core`] below, while the
-//! public [`Tmp102`] / [`Tmp112`] types carry the per-device identity
-//! (naming, datasheet accuracy specs, constructors).
-//!
-//! High-level behaviour (the Essential API) is implemented in
-//! [`crate::essential`] for each device type.
+//! Shared logic for TMP102 / TMP112 lives here. Device-specific aliases
+//! (`Tmp102`, `Tmp112`) are thin wrappers over the same [`Tmp1x2`] core
+//! because the Essential register map is identical.
 
 #[cfg(not(feature = "async"))]
 use embedded_hal::i2c::I2c;
@@ -14,125 +10,183 @@ use embedded_hal::i2c::I2c;
 use embedded_hal_async::i2c::I2c as AsyncI2c;
 
 use crate::errors::Error;
-use crate::register::Register;
+use crate::register::{Config, Register, RegisterU16};
 use crate::types::SlaveAddr;
 
-/// Shared bus logic for all supported devices.
-///
-/// Holds the I2C bus handle and the resolved 7-bit address, plus the
-/// read/write primitives every device type builds on.
-#[derive(Debug)]
-pub(crate) struct Core<I2C> {
-    i2c: I2C,
-    address: u8,
-}
+/// Base I2C address (ADD0 to GND).
+pub const DEVICE_BASE_ADDRESS: u8 = 0x48;
 
-impl<I2C> Core<I2C> {
-    pub(crate) fn new(i2c: I2C, address: SlaveAddr) -> Self {
-        Core {
-            i2c,
-            address: address.addr(),
-        }
-    }
-
-    pub(crate) fn destroy(self) -> I2C {
-        self.i2c
-    }
-}
-
+/// Generic TMP1x2 driver over any `embedded-hal` I2C implementation.
 #[maybe_async_cfg::maybe(
     sync(
         cfg(not(feature = "async")),
-        self = "Core",
+        self = "Tmp1x2",
         idents(AsyncI2c(sync = "I2c"))
     ),
     async(feature = "async", keep_self)
 )]
-impl<I2C, E> Core<I2C>
+#[derive(Debug)]
+pub struct Tmp1x2<I2C> {
+    /// Concrete I2C bus.
+    i2c: I2C,
+    /// 7-bit I2C address.
+    address: u8,
+    /// Cached copy of the configuration register.
+    pub(crate) config: Config,
+}
+
+/// TMP102 device (shared logic, see [`Tmp1x2`]).
+pub type Tmp102<I2C> = Tmp1x2<I2C>;
+
+/// TMP112 device / family (TMP112A/B/N share the Essential register map).
+pub type Tmp112<I2C> = Tmp1x2<I2C>;
+
+#[maybe_async_cfg::maybe(
+    sync(
+        cfg(not(feature = "async")),
+        self = "Tmp1x2",
+        idents(AsyncI2c(sync = "I2c"))
+    ),
+    async(feature = "async", keep_self)
+)]
+impl<I2C, E> Tmp1x2<I2C>
 where
     I2C: AsyncI2c<Error = E>,
 {
-    /// Read two bytes (MSB first) from a register.
-    pub(crate) async fn read_register_u16(&mut self, register: u8) -> Result<[u8; 2], Error<E>> {
-        let mut data = [0; 2];
-        self.i2c
-            .write_read(self.address, &[register], &mut data)
-            .await
-            .map_err(Error::I2C)?;
-        Ok(data)
+    /// Create a new driver instance. Device powers up in continuous mode.
+    pub fn new(i2c: I2C, address: SlaveAddr) -> Self {
+        Tmp1x2 {
+            i2c,
+            address: address.addr(DEVICE_BASE_ADDRESS),
+            config: Config::default(),
+        }
     }
 
-    /// Write two bytes (MSB first) to a register.
+    /// Destroy the driver and return the underlying I2C bus.
+    pub fn destroy(self) -> I2C {
+        self.i2c
+    }
+
+    /// Return the resolved 7-bit I2C address.
+    pub fn address(&self) -> u8 {
+        self.address
+    }
+
+    pub(crate) async fn write_config(&mut self, data: Config) -> Result<(), Error<E>> {
+        self.write_register(Register::CONFIG, data).await?;
+        self.config = data;
+        Ok(())
+    }
+
     pub(crate) async fn write_register(
         &mut self,
         register: u8,
-        msb: u8,
-        lsb: u8,
+        data: RegisterU16,
     ) -> Result<(), Error<E>> {
         self.i2c
-            .write(self.address, &[register, msb, lsb])
+            .write(self.address, &[register, data.msb, data.lsb])
             .await
-            .map_err(Error::I2C)
+            .map_err(Error::I2c)
     }
 
-    /// Read the raw configuration register without interpreting it.
-    pub(crate) async fn read_config_raw(&mut self) -> Result<[u8; 2], Error<E>> {
-        self.read_register_u16(Register::CONFIG).await
+    pub(crate) async fn read_register_u16(
+        &mut self,
+        register: u8,
+    ) -> Result<RegisterU16, Error<E>> {
+        let mut data = [0u8; 2];
+        self.i2c
+            .write_read(self.address, &[register], &mut data)
+            .await
+            .map_err(Error::I2c)?;
+        Ok(RegisterU16 {
+            msb: data[0],
+            lsb: data[1],
+        })
     }
 }
 
-/// Driver for the TMP102 digital temperature sensor.
+/// Convert raw temperature register bytes to Celsius.
 ///
-/// Accuracy: ±0.5°C (max) over the operating range without calibration.
-/// See the TMP102 datasheet for details.
-#[derive(Debug)]
-pub struct Tmp102<I2C> {
-    pub(crate) core: Core<I2C>,
-}
-
-impl<I2C> Tmp102<I2C> {
-    /// Create a new driver instance in continuous conversion mode.
-    ///
-    /// The driver does not touch the device configuration; it performs a
-    /// read-modify-write of the configuration register whenever the mode
-    /// is changed, so pre-existing device state is preserved.
-    pub fn new(i2c: I2C, address: SlaveAddr) -> Self {
-        Tmp102 {
-            core: Core::new(i2c, address),
+/// Handles both normal (12-bit) and extended (13-bit) modes; the mode is
+/// encoded in bit0 of the low byte as returned by the device.
+pub(crate) fn convert_temp_from_register(msb: u8, lsb: u8) -> f32 {
+    let mut sign = (u16::from(msb & 0b1000_0000)) << 8;
+    let extended_mode = (lsb & 1) != 0;
+    if extended_mode {
+        if sign != 0 {
+            sign |= 0b1111_0000 << 8;
         }
-    }
-
-    /// Destroy the driver and return the I2C bus instance.
-    pub fn destroy(self) -> I2C {
-        self.core.destroy()
+        let msb = u16::from(msb & 0b0111_1111);
+        let value = sign | (msb << 5) | u16::from(lsb >> 3);
+        f32::from(value as i16) * 0.0625
+    } else {
+        if sign != 0 {
+            sign |= 0b1111_1000 << 8;
+        }
+        let msb = u16::from(msb & 0b0111_1111);
+        let value = sign | (msb << 4) | u16::from(lsb >> 4);
+        f32::from(value as i16) * 0.0625
     }
 }
 
-/// Driver for the TMP112 family of digital temperature sensors
-/// (TMP112A, TMP112B, TMP112N).
+/// Convert Celsius to raw threshold register bytes (normal 12-bit mode).
 ///
-/// Register-compatible with the TMP102; the family members differ mainly
-/// in accuracy and supply-voltage optimisation:
-/// TMP112A/B offer 0.5°C accuracy, TMP112N offers 1°C accuracy.
-/// See the TMP112x datasheet for details.
-#[derive(Debug)]
-pub struct Tmp112<I2C> {
-    pub(crate) core: Core<I2C>,
+/// Clamps to `[-128.0, 127.9375]`.
+#[allow(clippy::manual_clamp)]
+pub(crate) fn convert_temp_to_register_normal(mut t: f32) -> (u8, u8) {
+    if t > 127.9375 {
+        t = 127.9375;
+    }
+    if t < -128.0 {
+        t = -128.0;
+    }
+    let value = t / 0.0625;
+    let value = (value as i16) << 4;
+    ((value >> 8) as u8, (value as u8 & 0b1111_0000))
 }
 
-impl<I2C> Tmp112<I2C> {
-    /// Create a new driver instance in continuous conversion mode.
-    ///
-    /// Behaviour is identical to [`Tmp102::new`]; only the device identity
-    /// differs.
-    pub fn new(i2c: I2C, address: SlaveAddr) -> Self {
-        Tmp112 {
-            core: Core::new(i2c, address),
-        }
+/// Convert Celsius to raw threshold register bytes (extended 13-bit mode).
+///
+/// Clamps to `[-256.0, 255.875]`.
+#[allow(clippy::manual_clamp)]
+pub(crate) fn convert_temp_to_register_extended(mut t: f32) -> (u8, u8) {
+    if t > 255.875 {
+        t = 255.875;
+    }
+    if t < -256.0 {
+        t = -256.0;
+    }
+    let value = t / 0.0625;
+    let value = (value as i16) << 3;
+    ((value >> 8) as u8, (value as u8 & 0b1111_1000))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn addresses_resolve() {
+        assert_eq!(0x48, SlaveAddr::Default.addr(DEVICE_BASE_ADDRESS));
+        assert_eq!(
+            0x49,
+            SlaveAddr::Alternative(false, true).addr(DEVICE_BASE_ADDRESS)
+        );
+        assert_eq!(
+            0x4A,
+            SlaveAddr::Alternative(true, false).addr(DEVICE_BASE_ADDRESS)
+        );
+        assert_eq!(
+            0x4B,
+            SlaveAddr::Alternative(true, true).addr(DEVICE_BASE_ADDRESS)
+        );
     }
 
-    /// Destroy the driver and return the I2C bus instance.
-    pub fn destroy(self) -> I2C {
-        self.core.destroy()
+    #[test]
+    fn converts_known_temperatures() {
+        // Normal mode vectors from datasheet / reference driver.
+        assert!((convert_temp_from_register(0b0110_0100, 0) - 100.0).abs() < f32::EPSILON);
+        assert!((convert_temp_from_register(0, 0) - 0.0).abs() < f32::EPSILON);
+        assert!((convert_temp_from_register(0b1000_0000, 0) + 128.0).abs() < f32::EPSILON);
     }
 }

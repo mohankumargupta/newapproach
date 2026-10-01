@@ -7,7 +7,7 @@
               0x48(ADD0 to GND)
               0x49(ADD0 to VDD)
               0x4A(ADD0 to SDA)
-              0x4B(ADD0 to SCL)
+              0x4B(ADD0 to SCL)  
 
 ### **Essential (Core Daily Operations)**
 

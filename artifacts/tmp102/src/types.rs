@@ -1,112 +1,103 @@
-//! Public configuration types.
-
-// NB: `SlaveAddr::addr` needs the device base address, which lives in
-// `register.rs` to keep the whole register map in one place.
-use crate::register::DEVICE_BASE_ADDRESS;
+//! I2C slave addresses and shared configuration types.
 
 /// Possible I2C slave addresses.
 ///
-/// The ADD0 pin selects one of four addresses:
-///
-/// | ADD0 connection | Address |
-/// | --------------- | ------- |
-/// | GND             | `0x48`  |
-/// | VDD             | `0x49`  |
-/// | SDA             | `0x4A`  |
-/// | SCL             | `0x4B`  |
+/// Base address `0x48`, lower two bits set by ADD0 pin strapping:
+/// - `0x48` ADD0 to GND
+/// - `0x49` ADD0 to VDD
+/// - `0x4A` ADD0 to SDA
+/// - `0x4B` ADD0 to SCL
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SlaveAddr {
-    /// `0x48` (ADD0 connected to GND).
+    /// Default address `0x48` (ADD0 to GND).
     #[default]
     Default,
-    /// Alternative address, providing bit values for `(A1, A0)`.
+    /// Alternative address from ADD0 strapping bits `(a1, a0)`.
     ///
-    /// - `(false, false)` → `0x48`
-    /// - `(false, true)` → `0x49`
-    /// - `(true, false)` → `0x4A`
-    /// - `(true, true)` → `0x4B`
+    /// Maps to `0x48 | (a1 << 1) | a0`, covering `0x48..=0x4B`.
     Alternative(bool, bool),
 }
 
 impl SlaveAddr {
-    pub(crate) fn addr(self) -> u8 {
+    /// Resolve to a 7-bit address given the device base address.
+    pub(crate) fn addr(self, default: u8) -> u8 {
         match self {
-            SlaveAddr::Default => DEVICE_BASE_ADDRESS,
-            SlaveAddr::Alternative(a1, a0) => {
-                DEVICE_BASE_ADDRESS | ((u8::from(a1)) << 1) | u8::from(a0)
-            }
+            SlaveAddr::Default => default,
+            SlaveAddr::Alternative(a1, a0) => default | ((a1 as u8) << 1) | a0 as u8,
         }
     }
 }
 
-/// Conversion rate of the sensor.
-///
-/// - [`Continuous`](ConversionMode::Continuous): the device converts
-///   temperature continuously (power-up default).
-/// - [`Shutdown`](ConversionMode::Shutdown): the device shuts down and
-///   stops converting, cutting current consumption to minimise power.
-///   A single conversion can then be triggered on demand (see
-///   Desirable one-shot support).
+/// Conversion mode (shutdown vs continuous).
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ConversionMode {
-    /// Continuous conversion mode (default).
+    /// Continuous conversion (active, default after power-up).
     #[default]
     Continuous,
-    /// Shutdown (one-shot) mode.
+    /// Shutdown / one-shot mode (sleep, low power).
     Shutdown,
 }
 
 /// Conversion rate for continuous conversion mode.
-///
-/// Controls how often the device converts in continuous mode,
-/// trading wake time / power against responsiveness.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ConversionRate {
-    /// 0.25 Hz (slowest, lowest power).
-    Hz0_25,
-    /// 1 Hz.
-    Hz1,
-    /// 4 Hz (power-up default).
+    /// 0.25 Hz
+    _0_25Hz,
+    /// 1 Hz
+    _1Hz,
+    /// 4 Hz (default)
     #[default]
-    Hz4,
-    /// 8 Hz (fastest, most responsive).
-    Hz8,
+    _4Hz,
+    /// 8 Hz
+    _8Hz,
 }
 
-/// Fault queue: number of consecutive faults needed to trigger an alert.
-///
-/// Used to debounce false alarms from transient temperature spikes.
+/// Fault queue: consecutive faults needed to trigger an alert.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FaultQueue {
-    /// 1 consecutive fault triggers an alert (power-up default).
+    /// 1 fault triggers an alert (default).
     #[default]
-    Consecutive1,
+    _1,
     /// 2 consecutive faults trigger an alert.
-    Consecutive2,
+    _2,
     /// 4 consecutive faults trigger an alert.
-    Consecutive4,
+    _4,
     /// 6 consecutive faults trigger an alert.
-    Consecutive6,
+    _6,
 }
 
-/// Alert polarity for the ALERT pin and alert flag.
+impl FaultQueue {
+    /// Alias matching `plan.md` snippet (`FaultQueue::Consecutive4`).
+    #[allow(non_upper_case_globals)]
+    pub const Consecutive1: Self = Self::_1;
+    /// Alias matching `plan.md` snippet.
+    #[allow(non_upper_case_globals)]
+    pub const Consecutive2: Self = Self::_2;
+    /// Alias matching `plan.md` snippet (`FaultQueue::Consecutive4`).
+    #[allow(non_upper_case_globals)]
+    pub const Consecutive4: Self = Self::_4;
+    /// Alias matching `plan.md` snippet.
+    #[allow(non_upper_case_globals)]
+    pub const Consecutive6: Self = Self::_6;
+}
+
+/// Alert (ALERT pin) polarity.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum AlertPolarity {
-    /// Active low (power-up default).
+    /// Active low (default).
     #[default]
     ActiveLow,
     /// Active high.
     ActiveHigh,
 }
 
-/// Thermostat mode controlling the ALERT pin behaviour.
+/// Thermostat mode for the ALERT pin.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ThermostatMode {
-    /// Comparator mode (power-up default): alert stays active until the
-    /// temperature falls below the low threshold.
+    /// Comparator mode (default): alert stays active until temperature
+    /// falls below the low threshold.
     #[default]
     Comparator,
-    /// Interrupt mode: alert is generated when the temperature exceeds the
-    /// high threshold or goes below the low threshold.
+    /// Interrupt mode: alert on crossing either threshold.
     Interrupt,
 }

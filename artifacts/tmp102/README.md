@@ -1,52 +1,64 @@
 # tmp102
 
-Platform-agnostic `no_std` driver for the TMP102 and TMP112 digital
-temperature sensors, implementing `embedded-hal` v1 and
-`embedded-hal-async` v1.
+`no_std` Rust driver for TMP102 / TMP112 (TMP112A/B/N) digital temperature sensors over I2C.
+Implements `embedded-hal` v1 (blocking) and `embedded-hal-async` v1 (async, via `async` feature).
 
-Scope: **Essential + Desirable + Rare** functionality — reading temperature,
-switching between continuous and shutdown conversion modes, triggering
-and polling one-shot measurements, setting the conversion rate, setting
-the high/low temperature thresholds, extended measurement mode, fault
-queue, alert polarity, thermostat mode, and comparator-mode alert status
-over I2C.
+## Status
+
+Essential stage implemented (plan items #1–#2):
+
+- `read_temperature()` → `f32` Celsius
+- `set_conversion_mode(ConversionMode::Shutdown | Continuous)`
+
+Desirable stage implemented (plan items #3–#6):
+
+- `trigger_one_shot_measurement()`
+- `is_one_shot_measurement_result_ready() -> bool`
+- `set_conversion_rate(ConversionRate::{_0_25Hz,_1Hz,_4Hz,_8Hz})`
+- `set_high/low_temperature_threshold(f32)` (clamped, extended-mode aware)
+
+Rare (#7–#11) implemented (plan items #7–#11):
+
+- `enable/disable_extended_measurement_mode()` (aliases `enable/disable_extended_mode()`)
+- `set_fault_queue(FaultQueue::{_1,_2,_4,_6})` (`FaultQueue::Consecutive4` alias works)
+- `set_alert_polarity(AlertPolarity::{ActiveLow,ActiveHigh})`
+- `set_thermostat_mode(ThermostatMode::{Comparator,Interrupt})`
+- `is_comparator_mode_alert_active() -> bool`
+
+## Addresses
+
+| ADD0 pin | Address |
+|---|---|
+| GND | `0x48` |
+| VDD | `0x49` |
+| SDA | `0x4A` |
+| SCL | `0x4B` |
+
+## Example
 
 ```rust
-use tmp102::{ConversionMode, ConversionRate, SlaveAddr, Tmp102};
+use tmp102::{ConversionMode, SlaveAddr, Tmp102};
 
 let mut sensor = Tmp102::new(i2c, SlaveAddr::default());
 let temp: f32 = sensor.read_temperature().unwrap();
 sensor.set_conversion_mode(ConversionMode::Shutdown).unwrap();
 sensor.set_conversion_mode(ConversionMode::Continuous).unwrap();
-// Desirable
-sensor.trigger_one_shot_measurement().unwrap();
-if sensor.is_one_shot_measurement_result_ready().unwrap() {
-    let temp: f32 = sensor.read_temperature().unwrap();
-}
-sensor.set_conversion_rate(ConversionRate::Hz1).unwrap();
-sensor.set_low_temperature_threshold(60.0).unwrap();
-sensor.set_high_temperature_threshold(80.0).unwrap();
-// Rare
-sensor.enable_extended_measurement_mode().unwrap();
-sensor.disable_extended_measurement_mode().unwrap();
-sensor.set_fault_queue(tmp102::FaultQueue::Consecutive4).unwrap();
-sensor.set_alert_polarity(tmp102::AlertPolarity::ActiveHigh).unwrap();
-sensor.set_thermostat_mode(tmp102::ThermostatMode::Interrupt).unwrap();
-let alert: bool = sensor.is_comparator_mode_alert_active().unwrap();
 ```
 
-Enable the `async` feature for the `embedded-hal-async` API.
+Async (feature `async`, same API with `.await`):
+
+```toml
+tmp102 = { version = "0.1.0", features = ["async"] }
+```
 
 ## Developer test
 
-Run unit + integration tests (blocking):
-
-```sh
+```bash
+# blocking (embedded-hal) incl. unit + integration tests
 cargo test
-```
-
-Run unit + integration tests (async):
-
-```sh
+# async (embedded-hal-async)
 cargo test --features async
+# lints
+cargo clippy --all-targets -- -D warnings
+cargo fmt --check
 ```

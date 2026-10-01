@@ -1,0 +1,21 @@
+Decoding that tmp102 driver request — mapping your workspace.
+Got the brief — Essential through Rare plus layout rules. I'll audit what's already built.
+Essential and Desirable are solid — Rare items #7-11 are still placeholders. I'll build those now.
+Core types done — now writing the Rare hardware controls.
+Tests pass but clippy rejects the plan-matching alias casing — fixing that plus formatting.
+Implemented Rare TMP102 driver in `artifacts/tmp102` (plan items #7–#11):
+
+**Scope:**
+- `enable/disable_extended_measurement_mode()` (+ `enable/disable_extended_mode()` aliases matching `tmp1x2` reference)
+- `set_fault_queue(FaultQueue::{_1,_2,_4,_6})` + `FaultQueue::Consecutive4` const alias so the plan snippet compiles
+- `set_alert_polarity(ActiveLow/ActiveHigh)`, `set_thermostat_mode(Comparator/Interrupt)`
+- `is_comparator_mode_alert_active() -> bool` (live CONFIG read, polarity-aware, per reference `reading.rs:105-110`)
+
+**Layout per `guidance-rust-crate-embedded`:** `src/rare.rs`, new types in `src/types.rs` exported from `lib.rs`, shared `Tmp1x2` core + `Tmp102`/`Tmp112` aliases untouched, single-source blocking+async via `maybe-async-cfg`. `register.rs` dead-code allows removed now flags are used.
+
+**Tests:** `tests/rare.rs` – 4 mock tests (extended enable/disable bytes `0xB0/0xA0`, FQ4 → `0x70`, polarity `0x64` + thermostat `0x66`, alert true/false vs polarity).
+
+**Verified:**
+- `cargo test` – 2 unit + 6 desirable + 5 essential + 4 rare + 2 doctest pass
+- `cargo test --features async` – same, `_async` variants pass
+- `cargo clippy --all-targets` (both features) clean, `cargo fmt --check` clean

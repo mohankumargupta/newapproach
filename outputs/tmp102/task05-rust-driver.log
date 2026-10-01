@@ -1,0 +1,21 @@
+Switching to the rust driver — I'll map the layout and locate the TMP102 code.
+Confirmed TMP102 is the target. I'll check the existing driver work and implementation standards.
+I've reviewed the plan and reference implementation. I'll now scaffold the Essential driver.
+Layout planned. I'll now write the Essential driver implementation.
+Build failed on field visibility — I'll fix that and re-run verification.
+Implemented Essential TMP102 driver in `artifacts/tmp102`:
+
+**Scope (plan.md Essential #1-#2 only):**
+- `read_temperature() -> f32`
+- `set_conversion_mode(Continuous|Shutdown)`
+
+**Layout per `guidance-rust-crate-embedded`:**
+- `src/lib.rs`, `tmp102.rs` (core `Tmp1x2<I2C>` + `Tmp102`/`Tmp112` aliases, shared logic), `essential.rs`, `register.rs`, `types.rs` (`SlaveAddr`, `ConversionMode`), `errors.rs` (`Error::I2c`), `desirable.rs`/`rare.rs` placeholders
+- `tests/essential.rs` – 5 mock tests, `README.md` with Developer test section
+
+**Both HALs:** single source via `maybe-async-cfg` – blocking (`embedded-hal`) by default, async (`embedded-hal-async`) with `--features async`.
+
+**Verified:**
+- `cargo test` – 2 unit + 5 integration + 2 doctest pass
+- `cargo test --features async` – same, `_async` variants pass
+- `cargo clippy --all-targets -- -D warnings` clean, `cargo fmt` clean

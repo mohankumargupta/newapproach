@@ -1,12 +1,9 @@
-//! Desirable functionality: one-shot control, conversion rate, thresholds.
+//! Desirable functionality (plan items #3–#6).
 //!
-//! This is the complete **Desirable** category from the device plan — the
-//! common configurations and optimisations:
-//!
-//! - Triggering a one-shot measurement in shutdown mode.
-//! - Polling one-shot readiness.
-//! - Setting the conversion rate.
-//! - Setting the high/low temperature thresholds.
+//! - trigger one-shot measurement
+//! - one-shot ready flag
+//! - conversion rate
+//! - high/low temperature thresholds
 
 #[cfg(not(feature = "async"))]
 use embedded_hal::i2c::I2c;
@@ -14,223 +11,114 @@ use embedded_hal::i2c::I2c;
 use embedded_hal_async::i2c::I2c as AsyncI2c;
 
 use crate::errors::Error;
-use crate::register::{BitFlagsHigh, BitFlagsLow, Register};
-use crate::tmp102::{Tmp102, Tmp112};
+use crate::register::{BitFlagsHigh, BitFlagsLow, Config, Register, RegisterU16};
+use crate::tmp102::{convert_temp_to_register_extended, convert_temp_to_register_normal, Tmp1x2};
 use crate::types::ConversionRate;
 
-/// Convert Celsius to threshold-register bytes in normal (12-bit) mode.
-///
-/// Clamped to `[-128.0, 127.9375]`; LSB weight 0.0625 °C.
-pub(crate) fn convert_temp_to_register_normal(mut temp: f32) -> (u8, u8) {
-    if temp > 127.9375 {
-        temp = 127.9375;
-    }
-    if temp < -128.0 {
-        temp = -128.0;
-    }
-    let value = (temp / 0.0625) as i16;
-    let value = value << 4;
-    ((value >> 8) as u8, (value as u8 & 0b1111_0000))
-}
-
-/// Convert Celsius to threshold-register bytes in extended (13-bit) mode.
-///
-/// Clamped to `[-256.0, 255.875]`; LSB weight 0.0625 °C.
-pub(crate) fn convert_temp_to_register_extended(mut temp: f32) -> (u8, u8) {
-    if temp > 255.875 {
-        temp = 255.875;
-    }
-    if temp < -256.0 {
-        temp = -256.0;
-    }
-    let value = (temp / 0.0625) as i16;
-    let value = value << 3;
-    ((value >> 8) as u8, (value as u8 & 0b1111_1000))
-}
-
 #[maybe_async_cfg::maybe(
     sync(
         cfg(not(feature = "async")),
-        self = "Tmp102",
+        self = "Tmp1x2",
         idents(AsyncI2c(sync = "I2c"))
     ),
     async(feature = "async", keep_self)
 )]
-impl<I2C, E> Tmp102<I2C>
+impl<I2C, E> Tmp1x2<I2C>
 where
     I2C: AsyncI2c<Error = E>,
 {
-    /// Trigger a single temperature conversion while in shutdown mode.
+    /// Trigger a one-shot measurement.
     ///
-    /// The device returns to shutdown once the conversion completes.
-    /// Poll [`is_one_shot_measurement_result_ready`](Self::is_one_shot_measurement_result_ready)
-    /// before reading the result with `read_temperature`.
+    /// Use in shutdown mode for on-demand conversions (low power).
+    /// The OS bit is sent on the wire but not cached in `self.config`,
+    /// matching the reference `tmp1x2` driver.
     pub async fn trigger_one_shot_measurement(&mut self) -> Result<(), Error<E>> {
-        let [msb, lsb] = self.core.read_config_raw().await?;
-        self.core
-            .write_register(Register::CONFIG, msb | BitFlagsHigh::ONE_SHOT, lsb)
-            .await
+        self.write_register(
+            Register::CONFIG,
+            self.config.with_high_msb(BitFlagsHigh::ONE_SHOT),
+        )
+        .await
     }
 
     /// Read whether the one-shot measurement result is ready.
     ///
-    /// Returns `true` once the conversion triggered by
-    /// [`trigger_one_shot_measurement`](Self::trigger_one_shot_measurement)
-    /// has completed.
+    /// Returns `true` once the OS flag reads back set, meaning the
+    /// conversion result can be fetched with [`read_temperature`](crate::Tmp1x2::read_temperature).
     pub async fn is_one_shot_measurement_result_ready(&mut self) -> Result<bool, Error<E>> {
-        let [msb, _] = self.core.read_config_raw().await?;
-        Ok((msb & BitFlagsHigh::ONE_SHOT) != 0)
+        let config = self.read_register_u16(Register::CONFIG).await?;
+        Ok((config.msb & BitFlagsHigh::ONE_SHOT) != 0)
     }
 
-    /// Set the conversion rate used in continuous conversion mode.
-    ///
-    /// Performs a read-modify-write of the configuration register so
-    /// all other device settings are preserved.
+    /// Set the conversion rate for continuous conversion mode.
     pub async fn set_conversion_rate(&mut self, rate: ConversionRate) -> Result<(), Error<E>> {
-        let [msb, lsb] = self.core.read_config_raw().await?;
-        let lsb = match rate {
-            ConversionRate::Hz0_25 => lsb & !BitFlagsLow::CONV_RATE1 & !BitFlagsLow::CONV_RATE0,
-            ConversionRate::Hz1 => lsb & !BitFlagsLow::CONV_RATE1 | BitFlagsLow::CONV_RATE0,
-            ConversionRate::Hz4 => lsb | BitFlagsLow::CONV_RATE1 & !BitFlagsLow::CONV_RATE0,
-            ConversionRate::Hz8 => lsb | BitFlagsLow::CONV_RATE1 | BitFlagsLow::CONV_RATE0,
-        };
-        self.core.write_register(Register::CONFIG, msb, lsb).await
-    }
-
-    /// Set the low temperature threshold in degrees Celsius.
-    ///
-    /// Uses 12-bit encoding normally, or 13-bit encoding when extended
-    /// measurement mode is currently enabled (see Rare API). Values are
-    /// clamped to the active range.
-    pub async fn set_low_temperature_threshold(&mut self, temp_c: f32) -> Result<(), Error<E>> {
-        self.write_temperature_threshold(temp_c, Register::T_LOW)
-            .await
+        let Config { msb, lsb } = self.config;
+        match rate {
+            ConversionRate::_0_25Hz => {
+                self.write_config(Config {
+                    msb,
+                    lsb: lsb & !BitFlagsLow::CONV_RATE1 & !BitFlagsLow::CONV_RATE0,
+                })
+                .await
+            }
+            ConversionRate::_1Hz => {
+                self.write_config(Config {
+                    msb,
+                    lsb: lsb & !BitFlagsLow::CONV_RATE1 | BitFlagsLow::CONV_RATE0,
+                })
+                .await
+            }
+            ConversionRate::_4Hz => {
+                self.write_config(Config {
+                    msb,
+                    lsb: lsb | BitFlagsLow::CONV_RATE1 & !BitFlagsLow::CONV_RATE0,
+                })
+                .await
+            }
+            ConversionRate::_8Hz => {
+                self.write_config(Config {
+                    msb,
+                    lsb: lsb | BitFlagsLow::CONV_RATE1 | BitFlagsLow::CONV_RATE0,
+                })
+                .await
+            }
+        }
     }
 
     /// Set the high temperature threshold in degrees Celsius.
     ///
-    /// Encoding and clamping behave as in
-    /// [`set_low_temperature_threshold`](Self::set_low_temperature_threshold).
-    pub async fn set_high_temperature_threshold(&mut self, temp_c: f32) -> Result<(), Error<E>> {
-        self.write_temperature_threshold(temp_c, Register::T_HIGH)
-            .await
-    }
-
-    async fn write_temperature_threshold(
+    /// Clamped to `[-128.0, 127.9375]` in normal mode and
+    /// `[-256.0, 255.875]` in extended mode (per cached config).
+    pub async fn set_high_temperature_threshold(
         &mut self,
-        temp_c: f32,
-        register: u8,
+        temperature: f32,
     ) -> Result<(), Error<E>> {
-        let [_, lsb_cfg] = self.core.read_config_raw().await?;
-        let extended = (lsb_cfg & BitFlagsLow::EXTENDED_MODE) != 0;
-        let (msb, lsb) = if extended {
-            convert_temp_to_register_extended(temp_c)
-        } else {
-            convert_temp_to_register_normal(temp_c)
-        };
-        self.core.write_register(register, msb, lsb).await
-    }
-}
-
-#[maybe_async_cfg::maybe(
-    sync(
-        cfg(not(feature = "async")),
-        self = "Tmp112",
-        idents(AsyncI2c(sync = "I2c"))
-    ),
-    async(feature = "async", keep_self)
-)]
-impl<I2C, E> Tmp112<I2C>
-where
-    I2C: AsyncI2c<Error = E>,
-{
-    /// Trigger a single temperature conversion while in shutdown mode.
-    ///
-    /// Same behaviour as [`Tmp102::trigger_one_shot_measurement`].
-    pub async fn trigger_one_shot_measurement(&mut self) -> Result<(), Error<E>> {
-        let [msb, lsb] = self.core.read_config_raw().await?;
-        self.core
-            .write_register(Register::CONFIG, msb | BitFlagsHigh::ONE_SHOT, lsb)
+        self.set_temperature_threshold(temperature, Register::T_HIGH)
             .await
-    }
-
-    /// Read whether the one-shot measurement result is ready.
-    ///
-    /// Same behaviour as [`Tmp102::is_one_shot_measurement_result_ready`].
-    pub async fn is_one_shot_measurement_result_ready(&mut self) -> Result<bool, Error<E>> {
-        let [msb, _] = self.core.read_config_raw().await?;
-        Ok((msb & BitFlagsHigh::ONE_SHOT) != 0)
-    }
-
-    /// Set the conversion rate used in continuous conversion mode.
-    ///
-    /// Same behaviour as [`Tmp102::set_conversion_rate`].
-    pub async fn set_conversion_rate(&mut self, rate: ConversionRate) -> Result<(), Error<E>> {
-        let [msb, lsb] = self.core.read_config_raw().await?;
-        let lsb = match rate {
-            ConversionRate::Hz0_25 => lsb & !BitFlagsLow::CONV_RATE1 & !BitFlagsLow::CONV_RATE0,
-            ConversionRate::Hz1 => lsb & !BitFlagsLow::CONV_RATE1 | BitFlagsLow::CONV_RATE0,
-            ConversionRate::Hz4 => lsb | BitFlagsLow::CONV_RATE1 & !BitFlagsLow::CONV_RATE0,
-            ConversionRate::Hz8 => lsb | BitFlagsLow::CONV_RATE1 | BitFlagsLow::CONV_RATE0,
-        };
-        self.core.write_register(Register::CONFIG, msb, lsb).await
     }
 
     /// Set the low temperature threshold in degrees Celsius.
     ///
-    /// Same behaviour as [`Tmp102::set_low_temperature_threshold`].
-    pub async fn set_low_temperature_threshold(&mut self, temp_c: f32) -> Result<(), Error<E>> {
-        self.write_temperature_threshold(temp_c, Register::T_LOW)
-            .await
-    }
-
-    /// Set the high temperature threshold in degrees Celsius.
-    ///
-    /// Same behaviour as [`Tmp102::set_high_temperature_threshold`].
-    pub async fn set_high_temperature_threshold(&mut self, temp_c: f32) -> Result<(), Error<E>> {
-        self.write_temperature_threshold(temp_c, Register::T_HIGH)
-            .await
-    }
-
-    async fn write_temperature_threshold(
+    /// Clamped to `[-128.0, 127.9375]` in normal mode and
+    /// `[-256.0, 255.875]` in extended mode (per cached config).
+    pub async fn set_low_temperature_threshold(
         &mut self,
-        temp_c: f32,
+        temperature: f32,
+    ) -> Result<(), Error<E>> {
+        self.set_temperature_threshold(temperature, Register::T_LOW)
+            .await
+    }
+
+    async fn set_temperature_threshold(
+        &mut self,
+        temperature: f32,
         register: u8,
     ) -> Result<(), Error<E>> {
-        let [_, lsb_cfg] = self.core.read_config_raw().await?;
-        let extended = (lsb_cfg & BitFlagsLow::EXTENDED_MODE) != 0;
-        let (msb, lsb) = if extended {
-            convert_temp_to_register_extended(temp_c)
+        let (msb, lsb) = if (self.config.lsb & BitFlagsLow::EXTENDED_MODE) != 0 {
+            convert_temp_to_register_extended(temperature)
         } else {
-            convert_temp_to_register_normal(temp_c)
+            convert_temp_to_register_normal(temperature)
         };
-        self.core.write_register(register, msb, lsb).await
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{
-        convert_temp_to_register_extended as to_ext, convert_temp_to_register_normal as to_reg,
-    };
-
-    #[test]
-    fn threshold_conversion_normal_is_clamped() {
-        assert_eq!((0b0111_1111, 0b1111_0000), to_reg(129.0));
-        assert_eq!((0b1000_0000, 0b0000_0000), to_reg(-129.0));
-    }
-
-    #[test]
-    fn threshold_conversion_extended_is_clamped() {
-        assert_eq!((0b0111_1111, 0b1111_0000), to_ext(256.0));
-        assert_eq!((0b1000_0000, 0b0000_0000), to_ext(-257.0));
-    }
-
-    #[test]
-    fn threshold_conversion_normal_values() {
-        assert_eq!((0b0001_1001, 0b0000_0000), to_reg(25.0));
-        assert_eq!((0b0101_0000, 0b0000_0000), to_reg(80.0));
-        assert_eq!((0b0000_0000, 0b0000_0000), to_reg(0.0));
-        assert_eq!((0b1110_0111, 0b0000_0000), to_reg(-25.0));
+        self.write_register(register, RegisterU16 { msb, lsb })
+            .await
     }
 }
