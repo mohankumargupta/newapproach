@@ -3,6 +3,10 @@ name: guidance-rust-crate-embedded
 description: Guidance for writing rust embedded crates properly
 ---
 
+This does not apply when writing device drivers for espforge folder,
+use espforge-device-driver skill instead.
+This is for pure rust crates under rustcrates folder.
+
 # File layout
 
 instead of everything under src/lib.rs, prefer:

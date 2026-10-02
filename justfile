@@ -53,6 +53,8 @@ task06-rust-driver-desirable:
 task07-rust-driver-rare:
   @just _stage rust-driver task07-rust-driver-rare Rare
 
+task08-espforge-add-device:
+  @just _stage espforge-add-device task-08-espforge-add-device
 
 task10-setup:
 	# sudo apt update
