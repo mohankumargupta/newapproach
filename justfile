@@ -56,12 +56,21 @@ task07-rust-driver-rare:
 task08-espforge-add-device:
   @just _stage espforge-add-device task-08-espforge-add-device
 
-task10-setup:
+task09-espforge-diff:
+  #!/usr/bin/env bash
+  set -x
+  dev=$(cat processing.txt)
+  cd espforge
+  git add .
+  git commit -m "implement device driver $dev"
+  git diff HEAD~1 HEAD > "../outputs/${dev}/diff.diff"
+
+task99-setup:
 	# sudo apt update
 	# sudo apt install libssl-dev
 	cargo install cargo-clone-crate cargo-mutants
 
-task11-clean:
+task99-clean:
 	rm -rf research outputs artifacts espforge rustcrates
 
 
